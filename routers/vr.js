@@ -1,9 +1,46 @@
+// routers/vr.js - Updated to handle client messages
 import { WebSocket } from 'ws';
 
 class WebSocketService {
   constructor() {
     this.clients = new Map();
     this.subscriptions = new Map(); // clientId -> Set of subscriptions
+  }
+
+  // Send table value to all clients
+  sendTable(table) {
+    const data = {
+      type: 'table_update',
+      table,
+      timestamp: new Date().toISOString(),
+    };
+    return this.broadcast(data);
+  }
+
+  // Send speed value to all clients
+  sendSpeed(speed) {
+    if (typeof speed !== 'number' || speed < 0.2 || speed > 1) {
+      throw new Error('Speed must be a number between 0.2 and 1');
+    }
+    const data = {
+      type: 'speed_update',
+      speed,
+      timestamp: new Date().toISOString(),
+    };
+    return this.broadcast(data);
+  }
+
+  // Send gameStart value to all clients
+  sendGameStart(gameStart) {
+    if (typeof gameStart !== 'boolean') {
+      throw new Error('gameStart must be a boolean');
+    }
+    const data = {
+      type: 'game_start_update',
+      gameStart,
+      timestamp: new Date().toISOString(),
+    };
+    return this.broadcast(data);
   }
 
   initialize(wss) {
@@ -69,6 +106,8 @@ class WebSocketService {
     const client = this.clients.get(clientId);
     if (!client) return;
 
+    console.log(`Received message from client ${clientId}:`, message);
+
     switch (message.type) {
       case 'subscribe':
         this.handleSubscription(clientId, message.data);
@@ -77,13 +116,130 @@ class WebSocketService {
         this.handleUnsubscription(clientId, message.data);
         break;
       case 'ping':
-        this.sendToClient(clientId, { type: 'pong' });
+        this.sendToClient(clientId, {
+          type: 'pong',
+          timestamp: new Date().toISOString(),
+        });
         break;
+
+      // Handle game state updates from React app
+      case 'speed_update':
+        this.handleSpeedUpdate(clientId, message);
+        break;
+      case 'table_update':
+        this.handleTableUpdate(clientId, message);
+        break;
+      case 'game_start_update':
+        this.handleGameStartUpdate(clientId, message);
+        break;
+
       default:
         console.log(
           `Unknown message type from client ${clientId}:`,
           message.type
         );
+        this.sendToClient(clientId, {
+          type: 'error',
+          message: `Unknown message type: ${message.type}`,
+        });
+    }
+  }
+
+  // Handle speed updates from React app
+  handleSpeedUpdate(clientId, message) {
+    try {
+      const { speed } = message;
+      if (typeof speed !== 'number' || speed < 0.2 || speed > 1) {
+        throw new Error('Speed must be a number between 0.2 and 1');
+      }
+
+      console.log(`Speed update from client ${clientId}: ${speed}`);
+
+      // Broadcast to all other clients (excluding sender)
+      const data = {
+        type: 'speed_update',
+        speed,
+        timestamp: new Date().toISOString(),
+        source: clientId,
+      };
+
+      this.broadcastExcluding(clientId, data);
+
+      // Send confirmation to sender
+      this.sendToClient(clientId, {
+        type: 'speed_update_confirmed',
+        speed,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.sendToClient(clientId, {
+        type: 'error',
+        message: error.message,
+      });
+    }
+  }
+
+  // Handle table updates from React app
+  handleTableUpdate(clientId, message) {
+    try {
+      const { table } = message;
+      console.log(`Table update from client ${clientId}: ${table}`);
+
+      // Broadcast to all other clients (excluding sender)
+      const data = {
+        type: 'table_update',
+        table,
+        timestamp: new Date().toISOString(),
+        source: clientId,
+      };
+
+      this.broadcastExcluding(clientId, data);
+
+      // Send confirmation to sender
+      this.sendToClient(clientId, {
+        type: 'table_update_confirmed',
+        table,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.sendToClient(clientId, {
+        type: 'error',
+        message: error.message,
+      });
+    }
+  }
+
+  // Handle game start updates from React app
+  handleGameStartUpdate(clientId, message) {
+    try {
+      const { gameStart } = message;
+      if (typeof gameStart !== 'boolean') {
+        throw new Error('gameStart must be a boolean');
+      }
+
+      console.log(`Game start update from client ${clientId}: ${gameStart}`);
+
+      // Broadcast to all other clients (excluding sender)
+      const data = {
+        type: 'game_start_update',
+        gameStart,
+        timestamp: new Date().toISOString(),
+        source: clientId,
+      };
+
+      this.broadcastExcluding(clientId, data);
+
+      // Send confirmation to sender
+      this.sendToClient(clientId, {
+        type: 'game_start_update_confirmed',
+        gameStart,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.sendToClient(clientId, {
+        type: 'error',
+        message: error.message,
+      });
     }
   }
 
@@ -143,6 +299,27 @@ class WebSocketService {
         client.ws.send(message);
         sentCount++;
       } else {
+        // Clean up disconnected clients
+        this.clients.delete(clientId);
+      }
+    });
+
+    return sentCount;
+  }
+
+  // Broadcast to all clients except the specified one
+  broadcastExcluding(excludeClientId, data) {
+    const message = JSON.stringify(data);
+    let sentCount = 0;
+
+    this.clients.forEach((client, clientId) => {
+      if (
+        clientId !== excludeClientId &&
+        client.ws.readyState === WebSocket.OPEN
+      ) {
+        client.ws.send(message);
+        sentCount++;
+      } else if (client.ws.readyState !== WebSocket.OPEN) {
         // Clean up disconnected clients
         this.clients.delete(clientId);
       }

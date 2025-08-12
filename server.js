@@ -4,30 +4,14 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import userRouter from './routers/user.js';
-import authRouter from './routers/auth.js';
-// import vrRouter from './routers/vr.js'; // New VR router
-// import { initializeWebSocket } from './services/websocketService.js';
+import websocketService, { initializeWebSocket } from './routers/vr.js';
+import { WebSocketServer } from 'ws';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-// MongoDB connection
-const connectDB = async () => {
-  try {
-    const mongoURI =
-      process.env.MONGODB_URI_DOCKER ||
-      process.env.MONGODB_URI ||
-      'mongodb://admin:password@localhost:27017/myapp?authSource=admin';
-    await mongoose.connect(mongoURI);
-    console.log('MongoDB connected successfully');
-  } catch (error) {
-    console.error('MongoDB connection error:', error);
-    process.exit(1);
-  }
-};
+let wss;
 
 // Middleware
 app.use(helmet()); // Security headers
@@ -41,30 +25,25 @@ app.use(morgan('combined')); // Logging
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
-// Routes
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Welcome to the Express API',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-  });
-});
-
 app.get('/health', (req, res) => {
-  const dbStatus =
-    mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-  res.json({
-    status: 'healthy',
-    database: dbStatus,
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-  });
+  res.json({ status: 'OK' });
 });
 
-app.use('/api/users', userRouter);
-app.use('/api/auth', authRouter);
+app.get('/ws-health', (req, res) => {
+  if (wss && wss.clients) {
+    res.json({
+      status: 'OK',
+      clients: wss.clients.size,
+      ready: true,
+    });
+  } else {
+    res.status(500).json({
+      status: 'WebSocket server not initialized',
+      ready: false,
+    });
+  }
+});
 
-// Error handling middleware
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
@@ -74,14 +53,30 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
+app.post('/api/game-state', (req, res) => {
+  const { table, speed, gameStart } = req.body;
+  try {
+    if (table !== undefined) websocketService.sendTable(table);
+    if (speed !== undefined) websocketService.sendSpeed(speed);
+    if (gameStart !== undefined) websocketService.sendGameStart(gameStart);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Start server
 const startServer = async () => {
   // await connectDB();
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   });
+
+  // Attach WebSocket server
+  wss = new WebSocketServer({ server });
+  initializeWebSocket(wss);
 };
 
 startServer();
