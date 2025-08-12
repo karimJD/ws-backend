@@ -30,7 +30,6 @@ class WebSocketService {
     return this.broadcast(data);
   }
 
-  // Send gameStart value to all clients
   sendGameStart(gameStart) {
     if (typeof gameStart !== 'boolean') {
       throw new Error('gameStart must be a boolean');
@@ -183,11 +182,11 @@ class WebSocketService {
   handleTableUpdate(clientId, message) {
     try {
       const { table } = message;
-      console.log(`Table update from client ${clientId}: ${table}`);
+      console.log(`Table debit update from client ${clientId}: ${table}`);
 
       // Broadcast to all other clients (excluding sender)
       const data = {
-        type: 'table_update',
+        type: 'debit_update',
         table,
         timestamp: new Date().toISOString(),
         source: clientId,
@@ -197,7 +196,7 @@ class WebSocketService {
 
       // Send confirmation to sender
       this.sendToClient(clientId, {
-        type: 'table_update_confirmed',
+        type: 'debit_update_confirmed',
         table,
         timestamp: new Date().toISOString(),
       });
@@ -209,7 +208,6 @@ class WebSocketService {
     }
   }
 
-  // Handle game start updates from React app
   handleGameStartUpdate(clientId, message) {
     try {
       const { gameStart } = message;
@@ -221,7 +219,7 @@ class WebSocketService {
 
       // Broadcast to all other clients (excluding sender)
       const data = {
-        type: 'game_start_update',
+        type: 'zones_toggle_update',
         gameStart,
         timestamp: new Date().toISOString(),
         source: clientId,
@@ -231,7 +229,7 @@ class WebSocketService {
 
       // Send confirmation to sender
       this.sendToClient(clientId, {
-        type: 'game_start_update_confirmed',
+        type: 'zones_toggle_update_confirmed',
         gameStart,
         timestamp: new Date().toISOString(),
       });
