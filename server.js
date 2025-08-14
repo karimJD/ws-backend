@@ -17,7 +17,10 @@ let wss;
 app.use(helmet()); // Security headers
 app.use(
   cors({
-    origin: 'http://localhost:3000', // or use an array for multiple origins
+    origin: [
+      'http://localhost:3000',
+      'https://tri-front-mm5s.vercel.app', // Add your Vercel app
+    ],
     credentials: true,
   })
 );
