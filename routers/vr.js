@@ -31,9 +31,9 @@ class WebSocketService {
   }
 
   sendGameStart(gameStart) {
-    if (typeof gameStart !== 'boolean') {
-      throw new Error('gameStart must be a boolean');
-    }
+    // if (typeof gameStart !== 'boolean') {
+    //   throw new Error('gameStart must be a boolean');
+    // }
     const data = {
       type: 'game_start_update',
       gameStart,
@@ -214,9 +214,9 @@ class WebSocketService {
   handleGameStartUpdate(clientId, message) {
     try {
       const { gameStart } = message;
-      if (typeof gameStart !== 'boolean') {
-        throw new Error('gameStart must be a boolean');
-      }
+      // if (typeof gameStart !== 'boolean') {
+      //   throw new Error('gameStart must be a boolean');
+      // }
 
       console.log(`Game start update from client ${clientId}: ${gameStart}`);
 
@@ -247,9 +247,9 @@ class WebSocketService {
   handleZonesToggleUpdate(clientId, data) {
     try {
       const { isZoneOn } = data;
-      if (typeof isZoneOn !== 'boolean') {
-        throw new Error('isZoneOn must be a boolean');
-      }
+      // if (typeof isZoneOn !== 'boolean') {
+      //   throw new Error('isZoneOn must be a boolean');
+      // }
 
       console.log(`Zones toggle update from client ${clientId}: ${isZoneOn}`);
 
