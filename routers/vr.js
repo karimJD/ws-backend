@@ -125,11 +125,14 @@ class WebSocketService {
       case 'speed_update':
         this.handleSpeedUpdate(clientId, message);
         break;
-      case 'table_update':
+      case 'debit_update':
         this.handleTableUpdate(clientId, message);
         break;
       case 'game_start_update':
         this.handleGameStartUpdate(clientId, message);
+        break;
+      case 'zones_toggle_update':
+        this.handleZonesToggleUpdate(clientId, message);
         break;
 
       default:
@@ -241,6 +244,37 @@ class WebSocketService {
     }
   }
 
+  handleZonesToggleUpdate(clientId, data) {
+    try {
+      const { isZoneOn } = data;
+      if (typeof isZoneOn !== 'boolean') {
+        throw new Error('isZoneOn must be a boolean');
+      }
+
+      console.log(`Zones toggle update from client ${clientId}: ${isZoneOn}`);
+
+      // Broadcast to all other clients (excluding sender)
+      const broadcastData = {
+        type: 'zones_toggle_update',
+        isZoneOn,
+        timestamp: new Date().toISOString(),
+        source: clientId,
+      };
+
+      this.broadcastExcluding(clientId, broadcastData);
+
+      this.sendToClient(clientId, {
+        type: 'zones_toggle_update_confirmed',
+        isZoneOn,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.sendToClient(clientId, {
+        type: 'error',
+        message: error.message,
+      });
+    }
+  }
   handleSubscription(clientId, subscriptionData) {
     const client = this.clients.get(clientId);
     if (!client) return;
