@@ -222,7 +222,7 @@ class WebSocketService {
 
       // Broadcast to all other clients (excluding sender)
       const data = {
-        type: 'zones_toggle_update',
+        type: 'game_start_update',
         gameStart,
         timestamp: new Date().toISOString(),
         source: clientId,
@@ -232,7 +232,7 @@ class WebSocketService {
 
       // Send confirmation to sender
       this.sendToClient(clientId, {
-        type: 'zones_toggle_update_confirmed',
+        type: 'game_start_update_confirmed',
         gameStart,
         timestamp: new Date().toISOString(),
       });
