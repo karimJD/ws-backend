@@ -381,73 +381,59 @@ class WebSocketService {
     }
   }
 
-  // NEW: Handle sorted objects updates from React app
-  handleSortedObjectsUpdate(clientId, message) {
-    try {
-      const { count } = message;
-      if (typeof count !== 'number' || count < 0) {
-        throw new Error('Sorted objects count must be a non-negative number');
-      }
+handleSortedObjectsUpdate(clientId, message) {
+  try {
+    // Change this line to use the correct key from the Unity message
+    const { sortedObjectType } = message; 
 
-      console.log(`Sorted objects update from client ${clientId}: ${count}`);
+    console.log(`Sorted objects update from client ${clientId}: ${sortedObjectType}`);
 
-      // Broadcast to all other clients (excluding sender)
-      const data = {
-        type: 'sorted_objects_update',
-        count,
-        timestamp: new Date().toISOString(),
-        source: clientId,
-      };
+    // Broadcast to all other clients (including the frontend dashboard)
+    const data = {
+      type: 'sorted_objects_update',
+      sortedObjectType,
+      timestamp: new Date().toISOString(),
+      source: clientId,
+    };
 
-      this.broadcastExcluding(clientId, data);
+    // Use broadcast method that sends to all clients, as Unity is a client and React dashboard is a client
+    // If you want to send to everyone, use `broadcast(data)`
+    // If you want to send only to clients with a subscription, use `broadcastToSubscription('sorted_objects_update', data)`
+    this.broadcastToSubscription('sorted_objects_update', data);
 
-      // Send confirmation to sender
-      this.sendToClient(clientId, {
-        type: 'sorted_objects_update_confirmed',
-        count,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      this.sendToClient(clientId, {
-        type: 'error',
-        message: error.message,
-      });
-    }
+  } catch (error) {
+    this.sendToClient(clientId, {
+      type: 'error',
+      message: error.message,
+    });
   }
+}
 
-  // NEW: Handle unsorted objects updates from React app
-  handleUnsortedObjectsUpdate(clientId, message) {
-    try {
-      const { count } = message;
-      if (typeof count !== 'number' || count < 0) {
-        throw new Error('Unsorted objects count must be a non-negative number');
-      }
+// NEW: Handle unsorted objects updates from VR app
+handleUnsortedObjectsUpdate(clientId, message) {
+  try {
+    // Change this line to use the correct key from the Unity message
+    const { unsortedObjectType } = message;
 
-      console.log(`Unsorted objects update from client ${clientId}: ${count}`);
+    console.log(`Unsorted objects update from client ${clientId}: ${unsortedObjectType}`);
 
-      // Broadcast to all other clients (excluding sender)
-      const data = {
-        type: 'unsorted_objects_update',
-        count,
-        timestamp: new Date().toISOString(),
-        source: clientId,
-      };
+    // Broadcast to all other clients
+    const data = {
+      type: 'unsorted_objects_update',
+      unsortedObjectType,
+      timestamp: new Date().toISOString(),
+      source: clientId,
+    };
 
-      this.broadcastExcluding(clientId, data);
+    this.broadcastToSubscription('unsorted_objects_update', data);
 
-      // Send confirmation to sender
+  } catch (error) {
       this.sendToClient(clientId, {
-        type: 'unsorted_objects_update_confirmed',
-        count,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      this.sendToClient(clientId, {
-        type: 'error',
-        message: error.message,
-      });
-    }
+      type: 'error',
+      message: error.message,
+    });
   }
+}
 
   // NEW: Handle errors updates from React app
   handleErrorsUpdate(clientId, message) {
