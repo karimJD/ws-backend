@@ -50,26 +50,26 @@ class WebSocketService {
   }
 
   // NEW: Send sorted objects count to all clients
-  sendSortedObjects(count) {
-    if (typeof count !== 'number' || count < 0) {
-      throw new Error('Sorted objects count must be a non-negative number');
-    }
+  sendSortedObjects(sortedObjectType) {
+    // if (typeof count !== 'number' || count < 0) {
+    //   throw new Error('Sorted objects count must be a non-negative number');
+    // }
     const data = {
       type: 'sorted_objects_update',
-      count,
+      sortedObjectType,
       timestamp: new Date().toISOString(),
     };
     return this.broadcast(data);
   }
 
   // NEW: Send unsorted objects count to all clients
-  sendUnsortedObjects(count) {
-    if (typeof count !== 'number' || count < 0) {
-      throw new Error('Unsorted objects count must be a non-negative number');
-    }
+  sendUnsortedObjects(unsortedObjectType) {
+    // if (typeof count !== 'number' || count < 0) {
+    //   throw new Error('Unsorted objects count must be a non-negative number');
+    // }
     const data = {
       type: 'unsorted_objects_update',
-      count,
+      unsortedObjectType,
       timestamp: new Date().toISOString(),
     };
     return this.broadcast(data);
