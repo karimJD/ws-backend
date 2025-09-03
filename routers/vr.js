@@ -1,4 +1,4 @@
-// routers/vr.js - Updated to handle client messages
+// routers/vr.js - Updated to handle client messages + new data types
 import { WebSocket } from 'ws';
 
 class WebSocketService {
@@ -31,12 +31,71 @@ class WebSocketService {
   }
 
   sendGameStart(gameStart) {
-    // if (typeof gameStart !== 'boolean') {
-    //   throw new Error('gameStart must be a boolean');
-    // }
     const data = {
       type: 'game_start_update',
       gameStart,
+      timestamp: new Date().toISOString(),
+    };
+    return this.broadcast(data);
+  }
+
+  // NEW: Send products data to all clients
+  sendProducts(generatedProductType) {
+    const data = {
+      type: 'products_update',
+      generatedProductType,
+      timestamp: new Date().toISOString(),
+    };
+    return this.broadcast(data);
+  }
+
+  // NEW: Send sorted objects count to all clients
+  sendSortedObjects(count) {
+    if (typeof count !== 'number' || count < 0) {
+      throw new Error('Sorted objects count must be a non-negative number');
+    }
+    const data = {
+      type: 'sorted_objects_update',
+      count,
+      timestamp: new Date().toISOString(),
+    };
+    return this.broadcast(data);
+  }
+
+  // NEW: Send unsorted objects count to all clients
+  sendUnsortedObjects(count) {
+    if (typeof count !== 'number' || count < 0) {
+      throw new Error('Unsorted objects count must be a non-negative number');
+    }
+    const data = {
+      type: 'unsorted_objects_update',
+      count,
+      timestamp: new Date().toISOString(),
+    };
+    return this.broadcast(data);
+  }
+
+  // NEW: Send errors count to all clients
+  sendErrors(count) {
+    if (typeof count !== 'number' || count < 0) {
+      throw new Error('Errors count must be a non-negative number');
+    }
+    const data = {
+      type: 'errors_update',
+      count,
+      timestamp: new Date().toISOString(),
+    };
+    return this.broadcast(data);
+  }
+
+  sendPickUpFromZone(zone) {
+    const validZones = ['red', 'green', 'yellow'];
+    if (!validZones.includes(zone.toLowerCase())) {
+      throw new Error('Zone must be one of: red, green, yellow');
+    }
+    const data = {
+      type: 'pickup_zone_update',
+      zone: zone.toLowerCase(),
       timestamp: new Date().toISOString(),
     };
     return this.broadcast(data);
@@ -135,6 +194,23 @@ class WebSocketService {
         this.handleZonesToggleUpdate(clientId, message);
         break;
 
+      // NEW: Handle new data type updates from React app
+      case 'products_update':
+        this.handleProductsUpdate(clientId, message);
+        break;
+      case 'sorted_objects_update':
+        this.handleSortedObjectsUpdate(clientId, message);
+        break;
+      case 'unsorted_objects_update':
+        this.handleUnsortedObjectsUpdate(clientId, message);
+        break;
+      case 'errors_update':
+        this.handleErrorsUpdate(clientId, message);
+        break;
+      case 'pickup_zone_update':
+        this.handlePickUpFromZone(clientId, message);
+        break;
+
       default:
         console.log(
           `Unknown message type from client ${clientId}:`,
@@ -214,11 +290,10 @@ class WebSocketService {
   handleGameStartUpdate(clientId, message) {
     try {
       const { isGameStarted } = message;
-      // if (typeof gameStart !== 'boolean') {
-      //   throw new Error('gameStart must be a boolean');
-      // }
 
-      console.log(`Game start update from client ${clientId}: ${isGameStarted}`);
+      console.log(
+        `Game start update from client ${clientId}: ${isGameStarted}`
+      );
 
       // Broadcast to all other clients (excluding sender)
       const data = {
@@ -244,12 +319,9 @@ class WebSocketService {
     }
   }
 
-  handleZonesToggleUpdate(clientId, data) {
+  handleZonesToggleUpdate(clientId, message) {
     try {
-      const { isZoneOn } = data;
-      // if (typeof isZoneOn !== 'boolean') {
-      //   throw new Error('isZoneOn must be a boolean');
-      // }
+      const { isZoneOn } = message;
 
       console.log(`Zones toggle update from client ${clientId}: ${isZoneOn}`);
 
@@ -266,6 +338,184 @@ class WebSocketService {
       this.sendToClient(clientId, {
         type: 'zones_toggle_update_confirmed',
         isZoneOn,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.sendToClient(clientId, {
+        type: 'error',
+        message: error.message,
+      });
+    }
+  }
+
+  // NEW: Handle products updates from React app
+  handleProductsUpdate(clientId, message) {
+    try {
+      const { generatedProductType } = message;
+
+      console.log(
+        `Products update from client ${clientId}: ${generatedProductType}`
+      );
+
+      // Broadcast to all other clients (excluding sender)
+      const data = {
+        type: 'products_update',
+        generatedProductType,
+        timestamp: new Date().toISOString(),
+        source: clientId,
+      };
+
+      this.broadcastExcluding(clientId, data);
+
+      // Send confirmation to sender
+      this.sendToClient(clientId, {
+        type: 'products_update_confirmed',
+        generatedProductType,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.sendToClient(clientId, {
+        type: 'error',
+        message: error.message,
+      });
+    }
+  }
+
+  // NEW: Handle sorted objects updates from React app
+  handleSortedObjectsUpdate(clientId, message) {
+    try {
+      const { count } = message;
+      if (typeof count !== 'number' || count < 0) {
+        throw new Error('Sorted objects count must be a non-negative number');
+      }
+
+      console.log(`Sorted objects update from client ${clientId}: ${count}`);
+
+      // Broadcast to all other clients (excluding sender)
+      const data = {
+        type: 'sorted_objects_update',
+        count,
+        timestamp: new Date().toISOString(),
+        source: clientId,
+      };
+
+      this.broadcastExcluding(clientId, data);
+
+      // Send confirmation to sender
+      this.sendToClient(clientId, {
+        type: 'sorted_objects_update_confirmed',
+        count,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.sendToClient(clientId, {
+        type: 'error',
+        message: error.message,
+      });
+    }
+  }
+
+  // NEW: Handle unsorted objects updates from React app
+  handleUnsortedObjectsUpdate(clientId, message) {
+    try {
+      const { count } = message;
+      if (typeof count !== 'number' || count < 0) {
+        throw new Error('Unsorted objects count must be a non-negative number');
+      }
+
+      console.log(`Unsorted objects update from client ${clientId}: ${count}`);
+
+      // Broadcast to all other clients (excluding sender)
+      const data = {
+        type: 'unsorted_objects_update',
+        count,
+        timestamp: new Date().toISOString(),
+        source: clientId,
+      };
+
+      this.broadcastExcluding(clientId, data);
+
+      // Send confirmation to sender
+      this.sendToClient(clientId, {
+        type: 'unsorted_objects_update_confirmed',
+        count,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.sendToClient(clientId, {
+        type: 'error',
+        message: error.message,
+      });
+    }
+  }
+
+  // NEW: Handle errors updates from React app
+  handleErrorsUpdate(clientId, message) {
+    try {
+      const { count } = message;
+      if (typeof count !== 'number' || count < 0) {
+        throw new Error('Errors count must be a non-negative number');
+      }
+
+      console.log(`Errors update from client ${clientId}: ${count}`);
+
+      // Broadcast to all other clients (excluding sender)
+      const data = {
+        type: 'errors_update',
+        count,
+        timestamp: new Date().toISOString(),
+        source: clientId,
+      };
+
+      this.broadcastExcluding(clientId, data);
+
+      // Send confirmation to sender
+      this.sendToClient(clientId, {
+        type: 'errors_update_confirmed',
+        count,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.sendToClient(clientId, {
+        type: 'error',
+        message: error.message,
+      });
+    }
+  }
+
+  // NEW: Handle pickup zone updates from React app
+  handlePickUpFromZone(clientId, message) {
+    try {
+      const { zone } = message;
+      const validZones = ['red', 'green', 'yellow'];
+
+      if (!zone || typeof zone !== 'string') {
+        throw new Error('Zone must be a string');
+      }
+
+      if (!validZones.includes(zone.toLowerCase())) {
+        throw new Error('Zone must be one of: red, green, yellow');
+      }
+
+      const normalizedZone = zone.toLowerCase();
+      console.log(
+        `Pickup from zone update from client ${clientId}: ${normalizedZone}`
+      );
+
+      // Broadcast to all other clients (excluding sender)
+      const data = {
+        type: 'pickup_zone_update',
+        zone: normalizedZone,
+        timestamp: new Date().toISOString(),
+        source: clientId,
+      };
+
+      this.broadcastExcluding(clientId, data);
+
+      // Send confirmation to sender
+      this.sendToClient(clientId, {
+        type: 'pickup_zone_update_confirmed',
+        zone: normalizedZone,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
