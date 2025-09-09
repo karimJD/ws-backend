@@ -39,6 +39,16 @@ class WebSocketService {
     return this.broadcast(data);
   }
 
+  // NEW: Send game end status to all clients
+  sendGameEnd(isGameOver) {
+    const data = {
+      type: 'game_end_update',
+      isGameOver,
+      timestamp: new Date().toISOString(),
+    };
+    return this.broadcast(data);
+  }
+
   // NEW: Send products data to all clients
   sendProducts(generatedProductType) {
     const data = {
@@ -190,6 +200,9 @@ class WebSocketService {
       case 'game_start_update':
         this.handleGameStartUpdate(clientId, message);
         break;
+      case 'game_end_update':
+        this.handleGameEndUpdate(clientId, message);
+        break;
       case 'zones_toggle_update':
         this.handleZonesToggleUpdate(clientId, message);
         break;
@@ -319,6 +332,37 @@ class WebSocketService {
     }
   }
 
+  // NEW: Handle game end updates from React app
+  handleGameEndUpdate(clientId, message) {
+    try {
+      const { isGameOver } = message;
+
+      console.log(`Game end update from client ${clientId}: ${isGameOver}`);
+
+      // Broadcast to all other clients (excluding sender)
+      const data = {
+        type: 'game_end_update',
+        isGameOver,
+        timestamp: new Date().toISOString(),
+        source: clientId,
+      };
+
+      this.broadcastExcluding(clientId, data);
+
+      // Send confirmation to sender
+      this.sendToClient(clientId, {
+        type: 'game_end_update_confirmed',
+        isGameOver,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.sendToClient(clientId, {
+        type: 'error',
+        message: error.message,
+      });
+    }
+  }
+
   handleZonesToggleUpdate(clientId, message) {
     try {
       const { isZoneOn } = message;
@@ -381,59 +425,61 @@ class WebSocketService {
     }
   }
 
-handleSortedObjectsUpdate(clientId, message) {
-  try {
-    // Change this line to use the correct key from the Unity message
-    const { sortedObjectType } = message; 
+  handleSortedObjectsUpdate(clientId, message) {
+    try {
+      // Change this line to use the correct key from the Unity message
+      const { sortedObjectType } = message;
 
-    console.log(`Sorted objects update from client ${clientId}: ${sortedObjectType}`);
+      console.log(
+        `Sorted objects update from client ${clientId}: ${sortedObjectType}`
+      );
 
-    // Broadcast to all other clients (including the frontend dashboard)
-    const data = {
-      type: 'sorted_objects_update',
-      sortedObjectType,
-      timestamp: new Date().toISOString(),
-      source: clientId,
-    };
+      // Broadcast to all other clients (including the frontend dashboard)
+      const data = {
+        type: 'sorted_objects_update',
+        sortedObjectType,
+        timestamp: new Date().toISOString(),
+        source: clientId,
+      };
 
-    // Use broadcast method that sends to all clients, as Unity is a client and React dashboard is a client
-    // If you want to send to everyone, use `broadcast(data)`
-    // If you want to send only to clients with a subscription, use `broadcastToSubscription('sorted_objects_update', data)`
-    this.broadcastToSubscription('sorted_objects_update', data);
-
-  } catch (error) {
-    this.sendToClient(clientId, {
-      type: 'error',
-      message: error.message,
-    });
-  }
-}
-
-// NEW: Handle unsorted objects updates from VR app
-handleUnsortedObjectsUpdate(clientId, message) {
-  try {
-    // Change this line to use the correct key from the Unity message
-    const { unsortedObjectType } = message;
-
-    console.log(`Unsorted objects update from client ${clientId}: ${unsortedObjectType}`);
-
-    // Broadcast to all other clients
-    const data = {
-      type: 'unsorted_objects_update',
-      unsortedObjectType,
-      timestamp: new Date().toISOString(),
-      source: clientId,
-    };
-
-    this.broadcastToSubscription('unsorted_objects_update', data);
-
-  } catch (error) {
+      // Use broadcast method that sends to all clients, as Unity is a client and React dashboard is a client
+      // If you want to send to everyone, use `broadcast(data)`
+      // If you want to send only to clients with a subscription, use `broadcastToSubscription('sorted_objects_update', data)`
+      this.broadcastToSubscription('sorted_objects_update', data);
+    } catch (error) {
       this.sendToClient(clientId, {
-      type: 'error',
-      message: error.message,
-    });
+        type: 'error',
+        message: error.message,
+      });
+    }
   }
-}
+
+  // NEW: Handle unsorted objects updates from VR app
+  handleUnsortedObjectsUpdate(clientId, message) {
+    try {
+      // Change this line to use the correct key from the Unity message
+      const { unsortedObjectType } = message;
+
+      console.log(
+        `Unsorted objects update from client ${clientId}: ${unsortedObjectType}`
+      );
+
+      // Broadcast to all other clients
+      const data = {
+        type: 'unsorted_objects_update',
+        unsortedObjectType,
+        timestamp: new Date().toISOString(),
+        source: clientId,
+      };
+
+      this.broadcastToSubscription('unsorted_objects_update', data);
+    } catch (error) {
+      this.sendToClient(clientId, {
+        type: 'error',
+        message: error.message,
+      });
+    }
+  }
 
   // NEW: Handle errors updates from React app
   handleErrorsUpdate(clientId, message) {
