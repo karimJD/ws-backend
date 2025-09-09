@@ -260,13 +260,13 @@ class WebSocketService {
   // Handle table updates from React app
   handleTableUpdate(clientId, message) {
     try {
-      const { table } = message;
-      console.log(`Table debit update from client ${clientId}: ${table}`);
+      const { debit } = message;
+      console.log(`Table debit update from client ${clientId}: ${debit}`);
 
       // Broadcast to all other clients (excluding sender)
       const data = {
         type: 'debit_update',
-        table,
+        debit,
         timestamp: new Date().toISOString(),
         source: clientId,
       };
@@ -276,7 +276,7 @@ class WebSocketService {
       // Send confirmation to sender
       this.sendToClient(clientId, {
         type: 'debit_update_confirmed',
-        table,
+        debit,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
