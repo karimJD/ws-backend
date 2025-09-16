@@ -52,7 +52,7 @@ class WebSocketService {
   // NEW: Send products data to all clients
   sendProducts(generatedProductType) {
     const data = {
-      type: 'products_update',
+      type: 'DestroyedTrash',
       generatedProductType,
       timestamp: new Date().toISOString(),
     };
@@ -206,24 +206,15 @@ class WebSocketService {
       case 'zones_toggle_update':
         this.handleZonesToggleUpdate(clientId, message);
         break;
-
-      // NEW: Handle new data type updates from React app
-      case 'products_update':
+      case 'DestroyedTrash':
         this.handleProductsUpdate(clientId, message);
         break;
-      case 'sorted_objects_update':
-        this.handleSortedObjectsUpdate(clientId, message);
+      case 'counter':
+        this.handleCountersUpdate(clientId, message);
         break;
-      case 'unsorted_objects_update':
-        this.handleUnsortedObjectsUpdate(clientId, message);
+      case 'zone_entered':
+        this.handleZoneEntered(clientId, message);
         break;
-      case 'errors_update':
-        this.handleErrorsUpdate(clientId, message);
-        break;
-      case 'pickup_zone_update':
-        this.handlePickUpFromZone(clientId, message);
-        break;
-
       default:
         console.log(
           `Unknown message type from client ${clientId}:`,
@@ -395,16 +386,14 @@ class WebSocketService {
   // NEW: Handle products updates from React app
   handleProductsUpdate(clientId, message) {
     try {
-      const { generatedProductType } = message;
+      const { object_name } = message;
 
-      console.log(
-        `Products update from client ${clientId}: ${generatedProductType}`
-      );
+      console.log(`Products update from client ${clientId}: ${object_name}`);
 
       // Broadcast to all other clients (excluding sender)
       const data = {
         type: 'products_update',
-        generatedProductType,
+        object_name,
         timestamp: new Date().toISOString(),
         source: clientId,
       };
@@ -414,7 +403,7 @@ class WebSocketService {
       // Send confirmation to sender
       this.sendToClient(clientId, {
         type: 'products_update_confirmed',
-        generatedProductType,
+        object_name,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
@@ -425,88 +414,45 @@ class WebSocketService {
     }
   }
 
-  handleSortedObjectsUpdate(clientId, message) {
+  handleCountersUpdate(clientId, message) {
     try {
       // Change this line to use the correct key from the Unity message
-      const { sortedObjectType } = message;
+      const { TotalEchec, TotalReussite, TotalOublie } = message;
+      let data = {};
 
-      console.log(
-        `Sorted objects update from client ${clientId}: ${sortedObjectType}`
-      );
-
-      // Broadcast to all other clients (including the frontend dashboard)
-      const data = {
-        type: 'sorted_objects_update',
-        sortedObjectType,
-        timestamp: new Date().toISOString(),
-        source: clientId,
-      };
-
-      // Use broadcast method that sends to all clients, as Unity is a client and React dashboard is a client
-      // If you want to send to everyone, use `broadcast(data)`
-      // If you want to send only to clients with a subscription, use `broadcastToSubscription('sorted_objects_update', data)`
-      this.broadcastToSubscription('sorted_objects_update', data);
-    } catch (error) {
-      this.sendToClient(clientId, {
-        type: 'error',
-        message: error.message,
-      });
-    }
-  }
-
-  // NEW: Handle unsorted objects updates from VR app
-  handleUnsortedObjectsUpdate(clientId, message) {
-    try {
-      // Change this line to use the correct key from the Unity message
-      const { unsortedObjectType } = message;
-
-      console.log(
-        `Unsorted objects update from client ${clientId}: ${unsortedObjectType}`
-      );
-
-      // Broadcast to all other clients
-      const data = {
-        type: 'unsorted_objects_update',
-        unsortedObjectType,
-        timestamp: new Date().toISOString(),
-        source: clientId,
-      };
-
-      this.broadcastToSubscription('unsorted_objects_update', data);
-    } catch (error) {
-      this.sendToClient(clientId, {
-        type: 'error',
-        message: error.message,
-      });
-    }
-  }
-
-  // NEW: Handle errors updates from React app
-  handleErrorsUpdate(clientId, message) {
-    try {
-      const { count } = message;
-      if (typeof count !== 'number' || count < 0) {
-        throw new Error('Errors count must be a non-negative number');
+      if (TotalEchec) {
+        data = {
+          type: 'counter',
+          TotalEchec,
+          timestamp: new Date().toISOString(),
+          source: clientId,
+        };
+        console.log(`Errors update ${clientId}: ${TotalEchec}`);
       }
 
-      console.log(`Errors update from client ${clientId}: ${count}`);
+      if (TotalReussite) {
+        data = {
+          type: 'counter',
+          TotalReussite,
+          timestamp: new Date().toISOString(),
+          source: clientId,
+        };
 
-      // Broadcast to all other clients (excluding sender)
-      const data = {
-        type: 'errors_update',
-        count,
-        timestamp: new Date().toISOString(),
-        source: clientId,
-      };
+        console.log(`Success update ${clientId}: ${TotalEchec}`);
+      }
 
-      this.broadcastExcluding(clientId, data);
+      if (TotalOublie) {
+        data = {
+          type: 'counter',
+          TotalOublie,
+          timestamp: new Date().toISOString(),
+          source: clientId,
+        };
 
-      // Send confirmation to sender
-      this.sendToClient(clientId, {
-        type: 'errors_update_confirmed',
-        count,
-        timestamp: new Date().toISOString(),
-      });
+        console.log(`Missed update ${clientId}: ${TotalEchec}`);
+      }
+
+      this.broadcastExcluding('counter', data);
     } catch (error) {
       this.sendToClient(clientId, {
         type: 'error',
@@ -515,41 +461,46 @@ class WebSocketService {
     }
   }
 
-  // NEW: Handle pickup zone updates from React app
-  handlePickUpFromZone(clientId, message) {
+  handleZoneEntered(clientId, message) {
     try {
-      const { zone } = message;
-      const validZones = ['red', 'green', 'yellow'];
+      const { green, red, yellow } = message;
 
-      if (!zone || typeof zone !== 'string') {
-        throw new Error('Zone must be a string');
+      let data;
+
+      if (green) {
+        data = {
+          type: 'zone_entered',
+          green,
+          timestamp: new Date().toISOString(),
+          source: clientId,
+        };
+
+        console.log(`Object picked up from GREEN ZONE ${clientId}: ${green}`);
       }
 
-      if (!validZones.includes(zone.toLowerCase())) {
-        throw new Error('Zone must be one of: red, green, yellow');
+      if (red) {
+        data = {
+          type: 'zone_entered',
+          red,
+          timestamp: new Date().toISOString(),
+          source: clientId,
+        };
+
+        console.log(`Object picked up from GREEN ZONE ${clientId}: ${red}`);
       }
 
-      const normalizedZone = zone.toLowerCase();
-      console.log(
-        `Pickup from zone update from client ${clientId}: ${normalizedZone}`
-      );
+      if (yellow) {
+        data = {
+          type: 'zone_entered',
+          yellow,
+          timestamp: new Date().toISOString(),
+          source: clientId,
+        };
 
-      // Broadcast to all other clients (excluding sender)
-      const data = {
-        type: 'pickup_zone_update',
-        zone: normalizedZone,
-        timestamp: new Date().toISOString(),
-        source: clientId,
-      };
+        console.log(`Object picked up from GREEN ZONE ${clientId}: ${yellow}`);
+      }
 
-      this.broadcastExcluding(clientId, data);
-
-      // Send confirmation to sender
-      this.sendToClient(clientId, {
-        type: 'pickup_zone_update_confirmed',
-        zone: normalizedZone,
-        timestamp: new Date().toISOString(),
-      });
+      this.broadcastExcluding('zone_entered', data);
     } catch (error) {
       this.sendToClient(clientId, {
         type: 'error',
@@ -557,6 +508,7 @@ class WebSocketService {
       });
     }
   }
+
   handleSubscription(clientId, subscriptionData) {
     const client = this.clients.get(clientId);
     if (!client) return;
