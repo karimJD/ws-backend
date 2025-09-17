@@ -99,10 +99,10 @@ class WebSocketService {
   }
 
   sendPickUpFromZone(zone) {
-    const validZones = ['red', 'green', 'yellow'];
-    if (!validZones.includes(zone.toLowerCase())) {
-      throw new Error('Zone must be one of: red, green, yellow');
-    }
+    // const validZones = ['red', 'green', 'yellow'];
+    // if (!validZones.includes(zone.toLowerCase())) {
+    //   throw new Error('Zone must be one of: red, green, yellow');
+    // }
     const data = {
       type: 'pickup_zone_update',
       zone: zone.toLowerCase(),
@@ -452,7 +452,7 @@ class WebSocketService {
         console.log(`Missed update ${clientId}: ${TotalOublie}`);
       }
 
-      this.broadcastExcluding('counter', data);
+      this.broadcastExcluding(clientId, data);
     } catch (error) {
       this.sendToClient(clientId, {
         type: 'error',
