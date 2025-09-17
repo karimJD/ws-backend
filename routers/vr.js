@@ -392,7 +392,7 @@ class WebSocketService {
 
       // Broadcast to all other clients (excluding sender)
       const data = {
-        type: 'products_update',
+        type: 'DestroyedTrash',
         object_name,
         timestamp: new Date().toISOString(),
         source: clientId,
@@ -402,7 +402,7 @@ class WebSocketService {
 
       // Send confirmation to sender
       this.sendToClient(clientId, {
-        type: 'products_update_confirmed',
+        type: 'DestroyedTrash_confirmed',
         object_name,
         timestamp: new Date().toISOString(),
       });
@@ -449,7 +449,7 @@ class WebSocketService {
           source: clientId,
         };
 
-        console.log(`Missed update ${clientId}: ${TotalEchec}`);
+        console.log(`Missed update ${clientId}: ${TotalOublie}`);
       }
 
       this.broadcastExcluding('counter', data);
