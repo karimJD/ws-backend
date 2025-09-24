@@ -215,6 +215,13 @@ class WebSocketService {
       case 'zone_entered':
         this.handleZoneEntered(clientId, message);
         break;
+      case 'game_start_confirmation':
+        this.handleGameStartUpdateConfirmation(clientId, message);
+        break;
+      case 'hand_pickup_object':
+        this.handleHandPickupObject(clientId, message);
+        break;
+
       default:
         console.log(
           `Unknown message type from client ${clientId}:`,
@@ -313,6 +320,41 @@ class WebSocketService {
       this.sendToClient(clientId, {
         type: 'game_start_update_confirmed',
         isGameStarted,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.sendToClient(clientId, {
+        type: 'error',
+        message: error.message,
+      });
+    }
+  }
+
+  handleGameStartUpdateConfirmation(clientId, message) {
+    try {
+      const { gameStart } = message;
+      if (typeof gameStart !== 'boolean') {
+        throw new Error('gameStart must be a boolean');
+      }
+
+      console.log(
+        `Game start confirmation from client ${clientId}: ${gameStart}`
+      );
+
+      // Broadcast to all other clients (excluding sender)
+      const data = {
+        type: 'game_start_confirmation',
+        gameStart,
+        timestamp: new Date().toISOString(),
+        source: clientId,
+      };
+
+      this.broadcastExcluding(clientId, data);
+
+      // Send confirmation to sender
+      this.sendToClient(clientId, {
+        type: 'game_start_confirmation',
+        gameStart,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
@@ -501,6 +543,44 @@ class WebSocketService {
       }
 
       this.broadcastExcluding('zone_entered', data);
+    } catch (error) {
+      this.sendToClient(clientId, {
+        type: 'error',
+        message: error.message,
+      });
+    }
+  }
+
+  handleHandPickupObject(clientId, message) {
+    try {
+      const { hand, handCount } = message;
+      console.log(
+        `User picked up object with ${hand} hand, count: ${handCount} from client ${clientId}`
+      );
+      if (hand !== 'left' && hand !== 'right') {
+        throw new Error("hand must be 'left' or 'right'");
+      }
+      if (typeof handCount !== 'number' || handCount < 0) {
+        throw new Error('handCount must be a non-negative number');
+      }
+
+      // Broadcast to all other clients (excluding sender)
+      const data = {
+        type: 'hand_pickup_object',
+        hand,
+        handCount,
+        timestamp: new Date().toISOString(),
+        source: clientId,
+      };
+
+      this.broadcastExcluding(clientId, data);
+
+      this.sendToClient(clientId, {
+        type: 'hand_pickup_object_confirmed',
+        hand,
+        handCount,
+        timestamp: new Date().toISOString(),
+      });
     } catch (error) {
       this.sendToClient(clientId, {
         type: 'error',
