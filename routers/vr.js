@@ -1,114 +1,8 @@
-// routers/vr.js - Updated to handle client messages + new data types
 import { WebSocket } from 'ws';
 
 class WebSocketService {
   constructor() {
     this.clients = new Map();
-    this.subscriptions = new Map(); // clientId -> Set of subscriptions
-  }
-
-  // Send table value to all clients
-  sendTable(table) {
-    const data = {
-      type: 'table_update',
-      table,
-      timestamp: new Date().toISOString(),
-    };
-    return this.broadcast(data);
-  }
-
-  // Send speed value to all clients
-  sendSpeed(speed) {
-    if (typeof speed !== 'number' || speed < 0.2 || speed > 1) {
-      throw new Error('Speed must be a number between 0.2 and 1');
-    }
-    const data = {
-      type: 'speed_update',
-      speed,
-      timestamp: new Date().toISOString(),
-    };
-    return this.broadcast(data);
-  }
-
-  sendGameStart(gameStart) {
-    const data = {
-      type: 'game_start_update',
-      gameStart,
-      timestamp: new Date().toISOString(),
-    };
-    return this.broadcast(data);
-  }
-
-  // NEW: Send game end status to all clients
-  sendGameEnd(isGameOver) {
-    const data = {
-      type: 'game_end_update',
-      isGameOver,
-      timestamp: new Date().toISOString(),
-    };
-    return this.broadcast(data);
-  }
-
-  // NEW: Send products data to all clients
-  sendProducts(generatedProductType) {
-    const data = {
-      type: 'DestroyedTrash',
-      generatedProductType,
-      timestamp: new Date().toISOString(),
-    };
-    return this.broadcast(data);
-  }
-
-  // NEW: Send sorted objects count to all clients
-  sendSortedObjects(sortedObjectType) {
-    // if (typeof count !== 'number' || count < 0) {
-    //   throw new Error('Sorted objects count must be a non-negative number');
-    // }
-    const data = {
-      type: 'sorted_objects_update',
-      sortedObjectType,
-      timestamp: new Date().toISOString(),
-    };
-    return this.broadcast(data);
-  }
-
-  // NEW: Send unsorted objects count to all clients
-  sendUnsortedObjects(unsortedObjectType) {
-    // if (typeof count !== 'number' || count < 0) {
-    //   throw new Error('Unsorted objects count must be a non-negative number');
-    // }
-    const data = {
-      type: 'unsorted_objects_update',
-      unsortedObjectType,
-      timestamp: new Date().toISOString(),
-    };
-    return this.broadcast(data);
-  }
-
-  // NEW: Send errors count to all clients
-  sendErrors(count) {
-    if (typeof count !== 'number' || count < 0) {
-      throw new Error('Errors count must be a non-negative number');
-    }
-    const data = {
-      type: 'errors_update',
-      count,
-      timestamp: new Date().toISOString(),
-    };
-    return this.broadcast(data);
-  }
-
-  sendPickUpFromZone(zone) {
-    // const validZones = ['red', 'green', 'yellow'];
-    // if (!validZones.includes(zone.toLowerCase())) {
-    //   throw new Error('Zone must be one of: red, green, yellow');
-    // }
-    const data = {
-      type: 'pickup_zone_update',
-      zone: zone.toLowerCase(),
-      timestamp: new Date().toISOString(),
-    };
-    return this.broadcast(data);
   }
 
   initialize(wss) {
@@ -120,7 +14,6 @@ class WebSocketService {
       // Store client connection
       this.clients.set(clientId, {
         ws,
-        subscriptions: new Set(),
         connectedAt: new Date(),
         ip: req.socket.remoteAddress,
       });
@@ -160,7 +53,6 @@ class WebSocketService {
           `Client ${clientId} disconnected. Code: ${code}, Reason: ${reason}`
         );
         this.clients.delete(clientId);
-        this.subscriptions.delete(clientId);
       });
 
       // Handle WebSocket errors
@@ -177,12 +69,6 @@ class WebSocketService {
     console.log(`Received message from client ${clientId}:`, message);
 
     switch (message.type) {
-      case 'subscribe':
-        this.handleSubscription(clientId, message.data);
-        break;
-      case 'unsubscribe':
-        this.handleUnsubscription(clientId, message.data);
-        break;
       case 'ping':
         this.sendToClient(clientId, {
           type: 'pong',
@@ -216,7 +102,7 @@ class WebSocketService {
         this.handleZoneEntered(clientId, message);
         break;
       case 'game_start_confirmation':
-        this.handleGameStartUpdateConfirmation(clientId, message);
+        this.handleGameStartConfirmation(clientId, message);
         break;
       case 'hand_pickup_object':
         this.handleHandPickupObject(clientId, message);
@@ -271,13 +157,13 @@ class WebSocketService {
   // Handle table updates from React app
   handleTableUpdate(clientId, message) {
     try {
-      const { debit } = message;
-      console.log(`Table debit update from client ${clientId}: ${debit}`);
+      const { table } = message;
+      console.log(`Table update from client ${clientId}: ${table}`);
 
       // Broadcast to all other clients (excluding sender)
       const data = {
-        type: 'debit_update',
-        debit,
+        type: 'table_update',
+        table,
         timestamp: new Date().toISOString(),
         source: clientId,
       };
@@ -286,8 +172,8 @@ class WebSocketService {
 
       // Send confirmation to sender
       this.sendToClient(clientId, {
-        type: 'debit_update_confirmed',
-        debit,
+        type: 'table_update_confirmed',
+        table,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
@@ -298,18 +184,20 @@ class WebSocketService {
     }
   }
 
+  // Handle game start updates from React app
   handleGameStartUpdate(clientId, message) {
     try {
-      const { isGameStarted } = message;
+      const { gameStart } = message;
+      if (typeof gameStart !== 'boolean') {
+        throw new Error('gameStart must be a boolean');
+      }
 
-      console.log(
-        `Game start update from client ${clientId}: ${isGameStarted}`
-      );
+      console.log(`Game start update from client ${clientId}: ${gameStart}`);
 
       // Broadcast to all other clients (excluding sender)
       const data = {
         type: 'game_start_update',
-        isGameStarted,
+        gameStart,
         timestamp: new Date().toISOString(),
         source: clientId,
       };
@@ -319,7 +207,7 @@ class WebSocketService {
       // Send confirmation to sender
       this.sendToClient(clientId, {
         type: 'game_start_update_confirmed',
-        isGameStarted,
+        gameStart,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
@@ -330,7 +218,8 @@ class WebSocketService {
     }
   }
 
-  handleGameStartUpdateConfirmation(clientId, message) {
+  // Handle game start confirmation from VR app
+  handleGameStartConfirmation(clientId, message) {
     try {
       const { gameStart } = message;
       if (typeof gameStart !== 'boolean') {
@@ -350,13 +239,6 @@ class WebSocketService {
       };
 
       this.broadcastExcluding(clientId, data);
-
-      // Send confirmation to sender
-      this.sendToClient(clientId, {
-        type: 'game_start_confirmation',
-        gameStart,
-        timestamp: new Date().toISOString(),
-      });
     } catch (error) {
       this.sendToClient(clientId, {
         type: 'error',
@@ -365,7 +247,6 @@ class WebSocketService {
     }
   }
 
-  // NEW: Handle game end updates from React app
   handleGameEndUpdate(clientId, message) {
     try {
       const { isGameOver } = message;
@@ -403,14 +284,14 @@ class WebSocketService {
       console.log(`Zones toggle update from client ${clientId}: ${isZoneOn}`);
 
       // Broadcast to all other clients (excluding sender)
-      const broadcastData = {
+      const data = {
         type: 'zones_toggle_update',
         isZoneOn,
         timestamp: new Date().toISOString(),
         source: clientId,
       };
 
-      this.broadcastExcluding(clientId, broadcastData);
+      this.broadcastExcluding(clientId, data);
 
       this.sendToClient(clientId, {
         type: 'zones_toggle_update_confirmed',
@@ -425,7 +306,6 @@ class WebSocketService {
     }
   }
 
-  // NEW: Handle products updates from React app
   handleProductsUpdate(clientId, message) {
     try {
       const { object_name } = message;
@@ -458,11 +338,10 @@ class WebSocketService {
 
   handleCountersUpdate(clientId, message) {
     try {
-      // Change this line to use the correct key from the Unity message
       const { TotalEchec, TotalReussite, TotalOublie } = message;
       let data = {};
 
-      if (TotalEchec) {
+      if (TotalEchec !== undefined) {
         data = {
           type: 'counter',
           TotalEchec,
@@ -472,25 +351,23 @@ class WebSocketService {
         console.log(`Errors update ${clientId}: ${TotalEchec}`);
       }
 
-      if (TotalReussite) {
+      if (TotalReussite !== undefined) {
         data = {
           type: 'counter',
           TotalReussite,
           timestamp: new Date().toISOString(),
           source: clientId,
         };
-
-        console.log(`Success update ${clientId}: ${TotalEchec}`);
+        console.log(`Success update ${clientId}: ${TotalReussite}`);
       }
 
-      if (TotalOublie) {
+      if (TotalOublie !== undefined) {
         data = {
           type: 'counter',
           TotalOublie,
           timestamp: new Date().toISOString(),
           source: clientId,
         };
-
         console.log(`Missed update ${clientId}: ${TotalOublie}`);
       }
 
@@ -505,44 +382,42 @@ class WebSocketService {
 
   handleZoneEntered(clientId, message) {
     try {
-      const { green, red, yellow } = message;
-
+      const { green, red, orange } = message;
       let data;
 
-      if (green) {
+      if (green !== undefined) {
         data = {
           type: 'zone_entered',
           green,
           timestamp: new Date().toISOString(),
           source: clientId,
         };
-
         console.log(`Object picked up from GREEN ZONE ${clientId}: ${green}`);
       }
 
-      if (red) {
+      if (red !== undefined) {
         data = {
           type: 'zone_entered',
           red,
           timestamp: new Date().toISOString(),
           source: clientId,
         };
-
-        console.log(`Object picked up from GREEN ZONE ${clientId}: ${red}`);
+        console.log(`Object picked up from RED ZONE ${clientId}: ${red}`);
       }
 
-      if (yellow) {
+      if (orange !== undefined) {
         data = {
           type: 'zone_entered',
-          yellow,
+          orange,
           timestamp: new Date().toISOString(),
           source: clientId,
         };
-
-        console.log(`Object picked up from GREEN ZONE ${clientId}: ${yellow}`);
+        console.log(`Object picked up from YELLOW ZONE ${clientId}: ${orange}`);
       }
 
-      this.broadcastExcluding('zone_entered', data);
+      if (data) {
+        this.broadcastExcluding(clientId, data);
+      }
     } catch (error) {
       this.sendToClient(clientId, {
         type: 'error',
@@ -557,6 +432,7 @@ class WebSocketService {
       console.log(
         `User picked up object with ${hand} hand, count: ${handCount} from client ${clientId}`
       );
+
       if (hand !== 'left' && hand !== 'right') {
         throw new Error("hand must be 'left' or 'right'");
       }
@@ -589,42 +465,6 @@ class WebSocketService {
     }
   }
 
-  handleSubscription(clientId, subscriptionData) {
-    const client = this.clients.get(clientId);
-    if (!client) return;
-
-    if (Array.isArray(subscriptionData)) {
-      subscriptionData.forEach((sub) => client.subscriptions.add(sub));
-    } else {
-      client.subscriptions.add(subscriptionData);
-    }
-
-    this.sendToClient(clientId, {
-      type: 'subscription_confirmed',
-      subscriptions: Array.from(client.subscriptions),
-    });
-
-    console.log(`Client ${clientId} subscribed to:`, subscriptionData);
-  }
-
-  handleUnsubscription(clientId, unsubscriptionData) {
-    const client = this.clients.get(clientId);
-    if (!client) return;
-
-    if (Array.isArray(unsubscriptionData)) {
-      unsubscriptionData.forEach((unsub) => client.subscriptions.delete(unsub));
-    } else {
-      client.subscriptions.delete(unsubscriptionData);
-    }
-
-    this.sendToClient(clientId, {
-      type: 'unsubscription_confirmed',
-      subscriptions: Array.from(client.subscriptions),
-    });
-
-    console.log(`Client ${clientId} unsubscribed from:`, unsubscriptionData);
-  }
-
   // Send message to specific client
   sendToClient(clientId, data) {
     const client = this.clients.get(clientId);
@@ -633,24 +473,6 @@ class WebSocketService {
       return true;
     }
     return false;
-  }
-
-  // Broadcast to all clients
-  broadcast(data) {
-    const message = JSON.stringify(data);
-    let sentCount = 0;
-
-    this.clients.forEach((client, clientId) => {
-      if (client.ws.readyState === WebSocket.OPEN) {
-        client.ws.send(message);
-        sentCount++;
-      } else {
-        // Clean up disconnected clients
-        this.clients.delete(clientId);
-      }
-    });
-
-    return sentCount;
   }
 
   // Broadcast to all clients except the specified one
@@ -674,53 +496,9 @@ class WebSocketService {
     return sentCount;
   }
 
-  // Broadcast to clients with specific subscription
-  broadcastToSubscription(subscriptionType, data) {
-    const message = JSON.stringify(data);
-    let sentCount = 0;
-
-    this.clients.forEach((client, clientId) => {
-      if (
-        client.subscriptions.has(subscriptionType) &&
-        client.ws.readyState === WebSocket.OPEN
-      ) {
-        client.ws.send(message);
-        sentCount++;
-      } else if (client.ws.readyState !== WebSocket.OPEN) {
-        // Clean up disconnected clients
-        this.clients.delete(clientId);
-      }
-    });
-
-    return sentCount;
-  }
-
   // Get connected clients count
   getConnectedClientsCount() {
     return this.clients.size;
-  }
-
-  // Get client info
-  getClientInfo(clientId) {
-    const client = this.clients.get(clientId);
-    if (!client) return null;
-
-    return {
-      clientId,
-      connectedAt: client.connectedAt,
-      ip: client.ip,
-      subscriptions: Array.from(client.subscriptions),
-      isConnected: client.ws.readyState === WebSocket.OPEN,
-    };
-  }
-
-  // Get all clients info
-  getAllClientsInfo() {
-    const clientsInfo = [];
-    this.clients.forEach((client, clientId) => {
-      clientsInfo.push(this.getClientInfo(clientId));
-    });
-    return clientsInfo;
   }
 
   generateClientId() {
