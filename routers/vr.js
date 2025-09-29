@@ -107,6 +107,9 @@ class WebSocketService {
       case 'hand_pickup_object':
         this.handleHandPickupObject(clientId, message);
         break;
+      case 'emergency_stop':
+        this.handleEmergencyStop(clientId, message);
+        break;
 
       default:
         console.log(
@@ -455,6 +458,36 @@ class WebSocketService {
         type: 'hand_pickup_object_confirmed',
         hand,
         handCount,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.sendToClient(clientId, {
+        type: 'error',
+        message: error.message,
+      });
+    }
+  }
+
+  handleEmergencyStop(clientId, message) {
+    try {
+      const { isEmergencyStop } = message;
+      console.log(
+        `User triggered emergency stop ${isEmergencyStop}, from client ${clientId}`
+      );
+
+      // Broadcast to all other clients (excluding sender)
+      const data = {
+        type: 'emergency_stop',
+        isEmergencyStop,
+        timestamp: new Date().toISOString(),
+        source: clientId,
+      };
+
+      this.broadcastExcluding(clientId, data);
+
+      this.sendToClient(clientId, {
+        type: 'emergency_stop_confirmed',
+        isEmergencyStop,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
