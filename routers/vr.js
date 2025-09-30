@@ -190,17 +190,19 @@ class WebSocketService {
   // Handle game start updates from React app
   handleGameStartUpdate(clientId, message) {
     try {
-      const { gameStart } = message;
-      if (typeof gameStart !== 'boolean') {
+      const { isGameStarted } = message;
+      if (typeof isGameStarted !== 'boolean') {
         throw new Error('gameStart must be a boolean');
       }
 
-      console.log(`Game start update from client ${clientId}: ${gameStart}`);
+      console.log(
+        `Game start update from client ${clientId}: ${isGameStarted}`
+      );
 
       // Broadcast to all other clients (excluding sender)
       const data = {
         type: 'game_start_update',
-        gameStart,
+        isGameStarted,
         timestamp: new Date().toISOString(),
         source: clientId,
       };
@@ -210,7 +212,7 @@ class WebSocketService {
       // Send confirmation to sender
       this.sendToClient(clientId, {
         type: 'game_start_update_confirmed',
-        gameStart,
+        isGameStarted,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
