@@ -190,19 +190,17 @@ class WebSocketService {
   // Handle game start updates from React app
   handleGameStartUpdate(clientId, message) {
     try {
-      const { isGameStarted } = message;
-      if (typeof isGameStarted !== 'boolean') {
+      const { gameStarted } = message;
+      if (typeof gameStarted !== 'boolean') {
         throw new Error('gameStart must be a boolean');
       }
 
-      console.log(
-        `Game start update from client ${clientId}: ${isGameStarted}`
-      );
+      console.log(`Game start update from client ${clientId}: ${gameStarted}`);
 
       // Broadcast to all other clients (excluding sender)
       const data = {
         type: 'game_start_update',
-        isGameStarted,
+        gameStarted,
         timestamp: new Date().toISOString(),
         source: clientId,
       };
