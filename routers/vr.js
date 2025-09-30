@@ -165,7 +165,7 @@ class WebSocketService {
 
       // Broadcast to all other clients (excluding sender)
       const data = {
-        type: 'table_update',
+        type: 'debit_update',
         table,
         timestamp: new Date().toISOString(),
         source: clientId,
@@ -175,7 +175,7 @@ class WebSocketService {
 
       // Send confirmation to sender
       this.sendToClient(clientId, {
-        type: 'table_update_confirmed',
+        type: 'debit_update_confirmed',
         table,
         timestamp: new Date().toISOString(),
       });
