@@ -210,7 +210,7 @@ class WebSocketService {
       // Send confirmation to sender
       this.sendToClient(clientId, {
         type: 'game_start_update_confirmed',
-        isGameStarted,
+        gameStarted,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
